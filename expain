@@ -1,0 +1,122 @@
+# Electronics Ecommerce Backend: Beginner Guide
+
+## What This Project Is
+
+This is a Node.js backend for an electronics ecommerce website. It uses Express to receive
+ browser requests, MySQL to store information, and Handlebars to render HTML pages on the server. 
+ The browser submits forms; the backend validates the data, reads or changes database records, 
+ and then renders a page or redirects the browser.
+
+The current code is a starter storefront and admin system, not a complete online store yet. 
+It includes user registration/login checks, admin/member pages, product and category management, and product image uploads. 
+A cart, orders, checkout, shipping, and payment processing still need to be designed and built.
+
+## Current Request Flow
+
+1. `app.js` creates the Express application, loads environment variables, configures Handlebars,
+ serves static files from `public`, and enables form and JSON parsing.
+2. It mounts route modules: `/auth` routes for registration/login, and the admin/product routes for their pages and actions.
+3. A route reads submitted form data from `req.body`, URL parameters from `req.params`, or uploaded files from `req.file`.
+4. A model function runs a parameterized SQL query through the shared MySQL connection in `config/db.js`.
+5. The route handles the result and responds by rendering a Handlebars view, redirecting, or sending an error response.
+
+The main folders in this project are:
+
+- `routes/`: URL paths and request/response handling.
+- `models/`: SQL queries and database operations for users, products, and categories.
+- `config/db.js`: MySQL connection settings, read from environment variables.
+- `views/`: Handlebars templates sent to the browser.
+- `views/layouts/` and `views/partials/`: shared page layout and reusable page sections.
+- `public/`: browser-accessible CSS, JavaScript, images, and uploaded product images.
+- `app.js`: application setup and route registration.
+
+## Features Already Present
+
+- Registration checks required fields, checks whether an email exists, hashes a password with `bcrypt`, and inserts a user.
+- Login finds a user by email and compares the submitted password with the stored password hash.
+- The admin dashboard loads users and counts admins and regular users.
+- Admin product tools can create categories and products, list products, edit products, and delete products.
+- `multer` stores uploaded product images under `public/uploads/products`.
+- Product queries join products to categories so pages can show category names.
+
+## Admin and Regular User Roles
+
+The app stores a `role` for each account. The login route checks that value after verifying the password and redirects an `admin` to `/admin` or a regular `user` to `/member`. These roles are meant to separate store management from customer activity.
+
+### Admin
+
+An admin is the store manager. The admin dashboard at `/admin` loads the registered accounts and displays counts for all users, administrators, and regular users. Its links lead to tools intended to:
+
+- Create product categories, such as electronics departments.
+- Create products with a category, name, description, price, stock quantity, and optional image.
+- View the product list, edit product information, and delete products. Deleting a product also attempts to delete its uploaded image.
+- Open a user-management page and return to the storefront.
+
+Some dashboard links are placeholders: settings is not implemented, and the user-management page currently has no populated user table or working management controls. The admin role is also not securely enforced by the current routes; see the security note below.
+
+### Regular User
+
+A regular user represents a customer account. The implemented account functions allow a visitor to register with a name, email, and password, and later log in. The password is stored as a bcrypt hash rather than plain text. Successful login redirects a regular user to `/member`.
+
+At present, `/member` is not a customer dashboard; it renders the same mostly empty page labeled “Manage Users.” The project does not yet implement customer-specific product browsing from the database, a shopping cart, checkout, order history, shipping, or payment processing. Those are typical customer features, but they should not be described as working features of this version.
+
+### Role and Access-Control Limitations
+
+Redirecting users to different pages after login is not the same as protecting those pages. The app does not create a session or token that remembers the signed-in account, and the admin and product-management routes do not check that the requester is an authenticated admin. In addition, public registration accepts the `role` from the submitted form, so a visitor could try to register with the `admin` role. Before deployment, assign `user` on the server during public registration, establish persistent authentication, and require an admin-role check on every admin-only page and action.
+
+## Important Beginner Concepts
+
+- **Node.js** runs JavaScript on the server. **npm** installs packages and runs project scripts.
+- **Express** is the web framework. A route such as `router.post('/create', ...)` handles a particular HTTP method and URL.
+- **HTTP methods** communicate intent: `GET` usually reads or displays something; `POST` submits a form or changes data. Later, an API may also use `PUT`/`PATCH` for updates and `DELETE` for deletion.
+- **Middleware** runs between receiving a request and reaching a route. This app uses middleware to parse form/JSON bodies, serve static files, and process uploads.
+- **Request data** comes from different places: `req.body` for submitted forms, `req.params` for URL parts such as `:id`, and `req.query` for URL query strings.
+- **Routes and models have different jobs.** Routes handle web behavior and responses; models contain database queries. Keeping those jobs separate makes changes easier to test.
+- **MySQL tables** store structured data. Primary keys identify rows; foreign keys connect related rows. A product's `category_id`, for example, should reference a category.
+- **Parameterized SQL** uses placeholders such as `WHERE email = ?` with values passed separately. Keep this pattern to reduce SQL injection risk; never build SQL by concatenating untrusted input.
+- **Async work** includes database calls and password hashing. The code currently uses both callbacks and `async`/`await`; understand which style each function expects and always handle errors.
+- **Environment variables** hold machine-specific configuration such as `PORT`, `DB_HOST`, `DB_USER`, `DB_PASS`, and `DB_NAME`. Keep real credentials in `.env`, do not commit or share that file, and provide a safe `.env.example` with placeholder values.
+- **Authentication** checks who a visitor is. **Authorization** checks what that visitor may do. A successful password check alone does not protect admin routes; the app needs a session or token plus authorization middleware on protected routes.
+- **Password hashes** are not reversible passwords. Store a strong hash, never the original password, and compare passwords using the password-hashing library.
+- **Validation** must happen on the server even if the browser also validates forms. Check types, lengths, allowed values, numeric ranges, and uploaded file types/sizes.
+
+## Main Data You Will Need
+
+- `users`: an ID, name, unique email, password hash, role, and timestamps.
+- `categories`: an ID, category name, and timestamps.
+- `products`: an ID, category foreign key, product name, description, price, stock quantity, image path, and timestamps.
+- For a real store, add `carts`/`cart_items` or an equivalent cart design, `orders`, `order_items`, addresses, and payment-provider references. Store order item prices as they were at purchase time so later product price changes do not rewrite order history.
+
+Decide table constraints early: emails should be unique; prices should use a fixed-precision decimal type; stock should not be negative; required fields should be `NOT NULL`; and foreign keys should express the relationships. Write and keep the schema/migrations in the project rather than relying on undocumented manual database setup.
+
+## Recommended Build Order
+
+1. Confirm the feature list, page flows, user roles, and database relationships before coding.
+2. Set up Node.js/npm, Express, MySQL, environment variables, and a repeatable database schema.
+3. Build and test one simple feature end to end: route, validation, model query, and page response.
+4. Add categories and product listing/detail pages, then product administration and safe image uploads.
+5. Implement login with a persistent session (or a deliberately chosen token design), logout, and authorization checks for every admin action.
+6. Add the cart, checkout/order records, stock updates, and order history. Use database transactions for multi-step changes such as creating an order and reducing stock.
+7. Integrate payments through a reputable payment provider. Do not store raw card numbers or security codes yourself.
+8. Add focused tests, useful error handling, logging, and deployment configuration. Test locally with realistic data before deploying.
+
+## Important Gaps To Fix Before Treating This As Production
+
+- The login route redirects based on a user's role, but the shown code does not establish a session or other persistent login state. The `/admin`, product-management, and member routes therefore need real authentication and role checks.
+- Registration accepts `role` from the submitted form. A public visitor must never be allowed to choose `admin`; assign the normal-user role on the server and reserve admin creation for a trusted process.
+- Check model filename casing. The files are named `User.js`, `Product.js`, and `Category.js`, while route imports use lowercase names. Windows often hides this mismatch, but a case-sensitive Linux server may fail to start.
+- Validate IDs, numeric prices/quantities, and uploaded files on the server. Restrict image types and sizes, and avoid trusting the original filename.
+- Check every database error before using its results. Return an error response and stop the request when a query fails.
+- Confirm that the MySQL schema matches the SQL in the models. This workspace code does not itself define a complete schema.
+- Keep secrets out of source control; do not expose database credentials or production `.env` contents.
+
+## Local Setup Checklist
+
+1. Install a supported Node.js LTS release and MySQL.
+2. From this project directory, install the dependencies with `npm install`.
+3. Create the database and tables required by the model queries.
+4. Configure `.env` with the database settings and optional port; do not publish its real values.
+5. Start the app with `npm start` and inspect the terminal for database or server errors.
+6. Try registration/login and product/category actions locally. Verify both successful requests and invalid input.
+
+This repository's `npm start` script runs `nodemon app.js`, so it restarts the server during development. `nodemon` is a development convenience, not a production process manager.
